@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glaude overlay design</title>
+<style>
+  :root { --ground: #f4f5f6; --surface: #ffffff; --raised: #e9ebee; --ink: #1b1d21; --soft: #5a606b; --accent: #0b6e5f; --warn: #a3471b; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ground); color: var(--ink); font: 17px/1.55 "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 920px; margin: 0 auto; padding: 48px 24px 96px; }
+  h1 { font-size: 2.4rem; line-height: 1.15; margin: 0 0 8px; }
+  h2 { font-size: 1.5rem; margin: 64px 0 16px; }
+  h3 { font-size: 1.15rem; margin: 28px 0 8px; }
+  p { margin: 0 0 12px; }
+  .status { color: var(--warn); font-weight: 600; margin-bottom: 32px; }
+  .box { background: var(--surface); border-radius: 10px; padding: 20px 24px; margin: 16px 0; }
+  .first { background: var(--raised); }
+  .first ul { margin: 8px 0 0; padding-left: 20px; }
+  table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: 10px; overflow: hidden; font-size: 0.95rem; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 14px; }
+  th { background: var(--raised); }
+  tr:nth-child(even) td { background: #f8f9fa; }
+  ul.check { list-style: none; padding: 0; margin: 12px 0 0; }
+  ul.check li { padding: 4px 0 4px 30px; position: relative; }
+  ul.check li::before { content: ""; position: absolute; left: 0; top: 8px; width: 16px; height: 16px; border-radius: 4px; background: var(--raised); }
+  ul.check li.ticked::before { background: var(--accent); }
+  .why { color: var(--soft); font-size: 0.95rem; }
+  code { font-family: Consolas, "Cascadia Mono", monospace; font-size: 0.92em; background: var(--raised); padding: 1px 5px; border-radius: 4px; }
+  .notes { margin-top: 16px; }
+  .notes label { display: block; font-size: 0.9rem; color: var(--soft); margin-bottom: 4px; }
+  .notes textarea { width: 100%; min-height: 64px; padding: 10px 12px; border: 0; border-radius: 8px; background: var(--ground); color: var(--ink); font: inherit; font-size: 0.95rem; resize: vertical; }
+  .notes textarea:focus { outline: 2px solid var(--accent); }
+  .bar { position: sticky; top: 0; z-index: 2; background: var(--ink); color: #fff; padding: 12px 24px; display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .bar span { font-size: 0.95rem; }
+  .bar button { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 9px 16px; font: inherit; font-size: 0.95rem; cursor: pointer; }
+  .bar button.plain { background: transparent; color: #cfd3d9; }
+
+  /* Mock of the overlay */
+  .mock { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #3a4a3e; border-radius: 10px; overflow: hidden; color: #e6e8eb; font-size: 13px; }
+  .mock .game { position: absolute; inset: 0; background: #3a4a3e; }
+  .mock .game i { position: absolute; display: block; background: #4d5f52; }
+  .mock .shade { position: absolute; inset: 0; background: rgba(11, 13, 16, 0.72); }
+  .mock .panel { position: absolute; left: 2.6%; top: 4.63%; right: 2.6%; bottom: 4.63%; background: #0f1215; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; }
+  .mock .rail { height: 40px; display: flex; align-items: stretch; padding: 0 8px; background: #15191d; }
+  .mock .rail button { background: none; border: 0; color: #9aa3ad; font: inherit; padding: 0 14px; cursor: default; border-bottom: 2px solid transparent; }
+  .mock .rail button.on { color: #e6e8eb; border-bottom-color: #2fbfa8; }
+  .mock .rail .hint { margin-left: auto; align-self: center; color: #6c757f; }
+  .mock .body { flex: 1; padding: 14px 18px; font-family: Consolas, "Cascadia Mono", monospace; font-size: 12.5px; line-height: 1.6; color: #c9d0d6; white-space: pre; }
+  .mock .body b { color: #2fbfa8; font-weight: normal; }
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <span>Write in any notes box. Then press Copy my notes and paste them to Claude.</span>
+  <span><button class="plain" id="clear">Clear notes</button> <button id="copy">Copy my notes</button></span>
+</div>
+
+<main>
+<h1>Glaude overlay design</h1>
+<p class="status">State: Draft 2026-10-28, waiting for your notes</p>
+
+<div class="box first">
+  <strong>Read this first</strong>
+  <ul>
+    <li>Goal: one hotkey in a game opens Claude, T3 Code, OpenCode or a terminal in a panel over the game, you look or type, press the hotkey again and you are back in the game. No Alt-Tab.</li>
+    <li>Decided today: standalone app in Glaude, Windows only for now, the app's real window is shown and focused (not a picture of it), in a panel that fills the screen except a 50px margin all round, with the dimmed game showing in that margin.</li>
+    <li>What it is not: it does not draw inside the game (no DirectX hook, no injected code), so it cannot upset anti-cheat and cannot show over true exclusive fullscreen. Section 3 says what that means in practice.</li>
+    <li>To change anything, write in the notes box under it, press Copy my notes, and paste to Claude.</li>
+  </ul>
+</div>
+
+<h2>1. What you see</h2>
+<div class="box">
+  <div class="mock" aria-label="Mock of the overlay open over a game">
+    <div class="game">
+      <i style="left:0;bottom:0;width:100%;height:22%"></i>
+      <i style="left:8%;bottom:22%;width:14%;height:30%"></i>
+      <i style="left:62%;bottom:22%;width:22%;height:46%"></i>
+    </div>
+    <div class="shade"></div>
+    <div class="panel">
+      <div class="rail">
+        <button class="on">Claude</button><button>T3 Code</button><button>OpenCode</button><button>Terminal</button>
+        <span class="hint">Ctrl+` closes · Ctrl+1-4 switches</span>
+      </div>
+      <div class="body"><b>›</b> Claude Code  ·  dev-0.3.1  ·  2 tasks running
+
+  Building Glaude 0.3.1 ..................... done 41s
+  Running tests ............................ 118 passed
+  <b>?</b> Push to GitHub and tag the release? (y/n)
+
+<b>›</b> _</div>
+    </div>
+  </div>
+  <p style="margin-top:14px">Press the hotkey. The game dims to about a quarter of its brightness and a panel fills the screen, leaving a 50px margin on every side where the dimmed game still shows, with your app already running in it. The strip along the top (the rail) names the apps you set up; the one in use is marked in the accent colour. Press the hotkey again or click the dimmed game and the panel goes, focus returns to the game, and the game's mouse lock comes back on its own because it is the foreground window again.</p>
+  <p>Inside the panel is the app's own window, as it looks normally. Glaude does not restyle it. The rail is the only piece of Glaude you see.</p>
+  <div class="notes" data-key="see"><label>Your notes on what you see</label><textarea></textarea></div>
+</div>
+
+<h2>2. How it works</h2>
+<div class="box">
+  <p>Glaude is a small tray app. It keeps the apps you chose running and parked off-screen, so opening is instant. The overlay is two windows:</p>
+  <ol>
+    <li><strong>The shade.</strong> Glaude's own window, borderless and transparent, stretched over the game's monitor, always on top, not in the taskbar. It paints the dim and the rail. A click on the dim closes the overlay.</li>
+    <li><strong>The app's real window.</strong> Glaude moves it from its parked spot to the panel rectangle, puts it above the shade (<code>SetWindowPos</code> with <code>HWND_TOPMOST</code>), and gives it focus so you can type.</li>
+  </ol>
+  <p>On close Glaude remembers which window was in front before it opened (the game), parks the app window again, hides the shade and hands the foreground back to the game. Nothing is injected into the game.</p>
+  <p class="why">Borrowed from Notifi, which already solved these on Windows: showing a window without stealing focus (<code>show_inactive</code>), parking a webview off-screen (the Island chat's <code>PARKED</code> spot), and letting go of global shortcuts while a page in front needs its keys (<code>give_way</code> / <code>take_back</code>). The Win32 bits are a few dozen lines each and get copied, not shared, so Glaude does not depend on Notifi.</p>
+  <h3>Finding the app's window</h3>
+  <p>Each app is an exe path plus arguments. Glaude starts the process (or attaches to it if it is already running, so Claude in the tray is not started twice), waits for its first top-level window with a title, and keeps that window handle. Electron apps (Claude, T3 Code) spawn helper processes; the main window belongs to the first process, which is the one Glaude started. If the window disappears (you closed the app inside the panel), the rail shows the app greyed and the next open starts it again.</p>
+  <div class="notes" data-key="how"><label>Your notes on how it works</label><textarea></textarea></div>
+</div>
+
+<h2>3. Where it works and where it cannot</h2>
+<div class="box">
+  <table>
+    <tr><th>Game display mode</th><th>Overlay</th><th>Why</th></tr>
+    <tr><td>Borderless window (most modern games' default)</td><td>Works</td><td>Windows composites every window, so a topmost window shows over the game.</td></tr>
+    <tr><td>Fullscreen with Fullscreen Optimisations on (the Windows 10/11 default)</td><td>Works</td><td>Windows treats it as a borderless window under the hood.</td></tr>
+    <tr><td>True exclusive fullscreen (optimisations turned off, or an old engine)</td><td>Does not show</td><td>The game owns the screen; only a hook inside the game could draw there. Steam and Discord do that by injecting code, which is the thing we are avoiding.</td></tr>
+  </table>
+  <p style="margin-top:14px">When the hotkey is pressed and the foreground window is exclusive fullscreen, Glaude cannot tell for sure from outside, so it does the next best thing: it still switches focus to the app (a plain app switch, like Alt-Tab), and the settings page explains how to set the game to Borderless. Honest limit, stated once.</p>
+  <p>Games that fight for the foreground (some anti-cheat titles call for focus every frame) will pull focus back off the panel. Glaude does not fight back. If this turns out common, the peek mode in the idea map (a live picture of the app, no focus change) is the answer.</p>
+  <div class="notes" data-key="limits"><label>Your notes on the limits</label><textarea></textarea></div>
+</div>
+
+<h2>4. Apps and the rail</h2>
+<div class="box">
+  <p>Presets you can turn on with one click, each checked against your machine when added:</p>
+  <table>
+    <tr><th>Preset</th><th>What Glaude runs</th></tr>
+    <tr><td>Claude</td><td>The Claude desktop app exe found in the usual install folder</td></tr>
+    <tr><td>T3 Code</td><td>The T3 Code exe</td></tr>
+    <tr><td>OpenCode</td><td>Your default terminal running <code>opencode</code></td></tr>
+    <tr><td>Terminal</td><td>Windows Terminal (or the terminal exe you choose)</td></tr>
+    <tr><td>Any program</td><td>An exe you pick, with arguments</td></tr>
+  </table>
+  <p style="margin-top:14px">One app set up: the hotkey opens it and the rail is hidden. Two or more: the rail shows them in your order, the hotkey opens the one you used last, <code>Ctrl+1</code> to <code>Ctrl+9</code> or a click switches. Every app gets the same panel: the game's monitor minus 50px on each side, measured in Windows display-scaled pixels so it looks the same at 1080p and 4K. The rail takes the top 40px of the panel; the app fills the rest.</p>
+  <div class="notes" data-key="apps"><label>Your notes on the apps</label><textarea></textarea></div>
+</div>
+
+<h2>5. Keys</h2>
+<div class="box">
+  <ul class="check">
+    <li><strong>Open and close:</strong> <code>Ctrl+`</code> by default (the drop-down terminal convention), rebindable in Settings. Not <code>Shift+Tab</code>: Steam owns it, and Claude Code uses it to change mode.</li>
+    <li><strong>Esc does not close the overlay.</strong> Claude Code and OpenCode use Esc to stop a reply. Close is the hotkey or a click on the dim.</li>
+    <li><strong>Switch app:</strong> <code>Ctrl+1</code> to <code>Ctrl+9</code> while open, also rebindable.</li>
+    <li><strong>Everything else</strong> goes straight to the app. Glaude registers only its own two shortcuts and lets go of the switch keys when the overlay is closed, so a game that uses <code>Ctrl+1</code> still gets it.</li>
+  </ul>
+  <div class="notes" data-key="keys"><label>Your notes on the keys</label><textarea></textarea></div>
+</div>
+
+<h2>6. Look</h2>
+<div class="box">
+  <p>One ground, one ink, one accent. The shade is near-black (<code>#0b0d10</code>) at 72% over the game. The rail is a plain strip, 40px, app names as text, the active one underlined in teal (<code>#2fbfa8</code>, the only accent colour anywhere in Glaude). Fade in 120ms, fade out 100ms, no slide, no glow, no blur. The Settings page uses the same three tones, dense layout, form lines. One typeface, Segoe UI.</p>
+  <p class="why">Follows the design bank's rules for the dark style you have approved before: no gradients, no shadows, no uppercase letter-spaced labels, teal as the sole accent.</p>
+  <div class="notes" data-key="look"><label>Your notes on the look</label><textarea></textarea></div>
+</div>
+
+<h2>7. Settings page</h2>
+<div class="box">
+  <p>Every option in-app, applied live, saved on change. Opened from the tray icon.</p>
+  <ul class="check">
+    <li>Hotkey and switch keys, rebindable by pressing them.</li>
+    <li>Apps: add preset or any exe, arguments, order, panel size, remove.</li>
+    <li>Dim level (slider) and animation on/off.</li>
+    <li>Start Glaude with Windows. Start the apps when Glaude starts, or on first open.</li>
+    <li>Check for updates button with release notes shown as Markdown; updates come from GitHub releases, checked at start and every few hours, downloaded in the background, installed on click or on quit.</li>
+    <li>About: version, licence, the standard disclaimer.</li>
+  </ul>
+  <div class="notes" data-key="settings"><label>Your notes on the settings</label><textarea></textarea></div>
+</div>
+
+<h2>8. Stack</h2>
+<div class="box">
+  <p>Tauri 2 + Rust + Svelte, like Notifi, so the patterns carry over. The <code>windows</code> crate for the few Win32 calls (hotkey, window move, foreground, enumerate windows by process). The shade and the rail are one Tauri window; Settings is a second. Updater: <code>tauri-plugin-updater</code> against GitHub releases. Two IntelliJ run configs (Main Run, Dev Run). <code>LICENSE</code> and README disclaimer from the template. Repo on a <code>dev-0.1.0</code> branch, plain tags for releases.</p>
+  <div class="notes" data-key="stack"><label>Your notes on the stack</label><textarea></textarea></div>
+</div>
+
+<h2>9. Milestones</h2>
+<div class="box">
+  <h3 style="margin-top:0">Milestone 1 "Proof" </h3>
+  <ul class="check">
+    <li>Tray app; hotkey shows and hides the shade over a borderless game, focus returns to the game.</li>
+    <li>One app (Windows Terminal) parked, shown in the panel, focused, parked again.</li>
+    <li>Settings: hotkey, one app, dim level.</li>
+    <li>Check: open Terminal over a borderless game 20 times in a row, type a command each time, no focus left on the wrong window, no visible flicker.</li>
+  </ul>
+  <h3>Milestone 2 "Pick your app"</h3>
+  <ul class="check">
+    <li>Several apps, the rail, switch keys.</li>
+    <li>Presets for Claude, T3 Code, OpenCode; attach to an already running app.</li>
+    <li>Updater, release notes, About with disclaimer, run configs, first release 0.1.0.</li>
+  </ul>
+  <h3>Idea map (not now)</h3>
+  <ul>
+    <li>Peek mode: a live DWM thumbnail of the app with no focus change, for a glance while a cutscene plays. Notifi has the thumbnail code.</li>
+    <li>A dot on the rail when an agent finishes a task, fed by Notifi's agent watchers.</li>
+    <li>Controller: hold the Guide button to open.</li>
+    <li>Side-panel layout; margin size as a setting; per-game profiles; Linux (Wayland layer-shell is a different design).</li>
+  </ul>
+  <div class="notes" data-key="milestones"><label>Your notes on the milestones</label><textarea></textarea></div>
+</div>
+
+<h2>10. Questions for you</h2>
+<div class="box">
+  <ol>
+    <li>Default hotkey? <span class="why">Claude recommends <code>Ctrl+`</code>: free in games and in all four apps.</span></li>
+    <li>Dim level? <span class="why">Claude recommends 72%: the game stays readable as context, the panel stands out.</span></li>
+    <li>Should the apps start when Glaude starts, or on first open? <span class="why">Claude recommends on first open: nothing runs you did not ask for, and the one-off wait is a second or two.</span></li>
+    <li>Is "Glaude" the shipped name? <span class="why">Fine as a repo name; if it ships, the About page needs it spelt out once.</span></li>
+  </ol>
+  <div class="notes" data-key="questions"><label>Your notes on the questions (your answers)</label><textarea></textarea></div>
+</div>
+</main>
+
+<script>
+  const KEY = "glaude-overlay-design-notes";
+  const saved = JSON.parse(localStorage.getItem(KEY) || "{}");
+  const boxes = [...document.querySelectorAll(".notes")];
+  for (const box of boxes) {
+    const area = box.querySelector("textarea");
+    area.value = saved[box.dataset.key] || "";
+    area.addEventListener("input", () => {
+      saved[box.dataset.key] = area.value;
+      localStorage.setItem(KEY, JSON.stringify(saved));
+    });
+  }
+  document.getElementById("copy").addEventListener("click", async (e) => {
+    const lines = boxes
+      .filter((b) => b.querySelector("textarea").value.trim())
+      .map((b) => `[${b.querySelector("label").textContent.replace("Your notes on ", "")}]\n${b.querySelector("textarea").value.trim()}`);
+    const text = lines.length ? "Design notes:\n\n" + lines.join("\n\n") : "Design notes: none";
+    await navigator.clipboard.writeText(text);
+    e.target.textContent = "Copied";
+    setTimeout(() => (e.target.textContent = "Copy my notes"), 1500);
+  });
+  document.getElementById("clear").addEventListener("click", () => {
+    if (!confirm("Clear all your notes on this page?")) return;
+    localStorage.removeItem(KEY);
+    for (const b of boxes) b.querySelector("textarea").value = "";
+    for (const k in saved) delete saved[k];
+  });
+</script>
+</body>
+</html>

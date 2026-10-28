@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Milestone 1 guide</title>
+<style>
+  :root { --ground: #f4f5f6; --surface: #ffffff; --raised: #e9ebee; --ink: #1b1d21; --soft: #5a606b; --accent: #0b6e5f; --warn: #a3471b; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ground); color: var(--ink); font: 17px/1.55 "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 920px; margin: 0 auto; padding: 48px 24px 96px; }
+  h1 { font-size: 2.4rem; line-height: 1.15; margin: 0 0 8px; }
+  h2 { font-size: 1.5rem; margin: 64px 0 16px; }
+  h3 { font-size: 1.15rem; margin: 28px 0 8px; }
+  p { margin: 0 0 12px; }
+  .status { color: var(--warn); font-weight: 600; margin-bottom: 32px; }
+  .box { background: var(--surface); border-radius: 10px; padding: 20px 24px; margin: 16px 0; }
+  .first { background: var(--raised); }
+  .first ul { margin: 8px 0 0; padding-left: 20px; }
+  table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: 10px; overflow: hidden; font-size: 0.95rem; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 14px; }
+  th { background: var(--raised); }
+  tr:nth-child(even) td { background: #f8f9fa; }
+  .ms-head { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; flex-wrap: wrap; }
+  .ms-head h3 { margin: 0; }
+  .state { color: var(--soft); font-weight: 600; }
+  .state.now { color: var(--accent); }
+  .state.done { color: var(--soft); text-decoration: line-through; }
+  ul.check { list-style: none; padding: 0; margin: 12px 0 0; }
+  ul.check li { padding: 4px 0 4px 30px; position: relative; }
+  ul.check li::before { content: ""; position: absolute; left: 0; top: 8px; width: 16px; height: 16px; border-radius: 4px; background: var(--raised); }
+  ul.check li.ticked::before { background: var(--accent); }
+  ul.check li.ticked { color: var(--soft); }
+  .why { color: var(--soft); font-size: 0.95rem; }
+  ol.pillars li { margin-bottom: 10px; }
+  .notes { margin-top: 16px; }
+  .notes label { display: block; font-size: 0.9rem; color: var(--soft); margin-bottom: 4px; }
+  .notes textarea { width: 100%; min-height: 64px; padding: 10px 12px; border: 0; border-radius: 8px; background: var(--ground); color: var(--ink); font: inherit; font-size: 0.95rem; resize: vertical; }
+  .notes textarea:focus { outline: 2px solid var(--accent); }
+  .bar { position: sticky; top: 0; z-index: 2; background: var(--ink); color: #fff; padding: 12px 24px; display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .bar span { font-size: 0.95rem; }
+  .bar button { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 9px 16px; font: inherit; font-size: 0.95rem; cursor: pointer; }
+  .bar button.plain { background: transparent; color: #cfd3d9; }
+  nav { margin: 24px 0 0; color: var(--soft); font-size: 0.95rem; }
+  nav a { color: var(--accent); margin-right: 14px; white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <span>Write in any notes box. Then press Copy my notes and paste them to Claude.</span>
+  <span><button class="plain" id="clear">Clear notes</button> <button id="copy">Copy my notes</button></span>
+</div>
+
+<main>
+<h1>Milestone 1 "Proof"</h1>
+<p class="status">State: In progress: approved 2026-10-28</p>
+
+<div class="box first">
+  <strong>Read this first</strong>
+  <ul>
+    <li>Goal: prove the loop works. The hotkey opens Windows Terminal in a panel over a dimmed borderless game, and pressing it again returns focus to the game, 20 times in a row.</li>
+    <li>Out of scope: several apps, the rail, switch keys, presets for Claude, T3 Code and OpenCode, attaching to a running app, the updater and About page (all milestone 2 in the bible), and anything in the idea map.</li>
+    <li>To change anything, write in the notes box under it, press Copy my notes, and paste to Claude.</li>
+  </ul>
+</div>
+
+<h2>1. Parts</h2>
+<div class="box">
+  <ul class="check">
+    <li class="ticked"><strong>Tray app:</strong> Glaude runs from the tray and has a Settings window opened from the tray icon.</li>
+    <li class="ticked"><strong>Hotkey:</strong> <code>Ctrl+`</code> by default, registered with <code>tauri-plugin-global-shortcut</code>. Pressed once it opens the overlay, pressed again it closes it.</li>
+    <li class="ticked"><strong>Shade:</strong> a borderless, transparent, always-on-top window over the game's monitor, dimmed to 72% by default. A click on the dim closes the overlay. Fade in 120ms, fade out 100ms.</li>
+    <li class="ticked"><strong>One app:</strong> Windows Terminal is started on first open, found by its first top-level window, and parked when closed. Parked means moved off-screen and hidden (<code>SW_HIDE</code>), so it leaves no taskbar button. On open it moves to the panel (the monitor minus 50px on every side), goes above the shade and takes focus.</li>
+    <li class="ticked"><strong>Focus handback:</strong> on open Glaude remembers the foreground window (the game). On close it parks the app, hides the shade and gives the foreground back to the game, so the game's mouse lock returns on its own.</li>
+    <li><strong>Settings:</strong> hotkey, the one app (path and arguments), and dim level. Applied live and saved on change.</li>
+  </ul>
+  <div class="notes" data-key="parts"><label>Your notes on the parts</label><textarea></textarea></div>
+</div>
+
+<h2>2. Questions for doolecg</h2>
+<div class="box">
+  <p>All four questions from the design are settled, with the recommended answers, on 2026-10-28.</p>
+  <ol>
+    <li>Default hotkey? <span class="why">Settled: <code>Ctrl+`</code>. Free in games and in all four apps.</span></li>
+    <li>Dim level? <span class="why">Settled: 72%. The game stays readable as context, the panel stands out.</span></li>
+    <li>Start the apps when Glaude starts, or on first open? <span class="why">Settled: on first open. Nothing runs that you did not ask for.</span></li>
+    <li>Is "Glaude" the shipped name? <span class="why">Settled: yes. The About page spells it out once.</span></li>
+  </ol>
+  <div class="notes" data-key="questions"><label>Your notes on the questions (your answers)</label><textarea></textarea></div>
+</div>
+
+<h2>3. How to test each step</h2>
+<div class="box">
+  <h3 style="margin-top:0">Step 1: run the app</h3>
+  <ol>
+    <li>In a terminal in <code>E:\REPOS\AI TOOLS\Glaude</code>, run <code>npm install</code> once, then <code>npm run dev</code>. Or press the Dev Run config in IntelliJ.</li>
+    <li>A Glaude icon appears in the tray. No window opens; left-click the icon for Settings, right-click for the menu.</li>
+  </ol>
+  <p class="why">Test steps for each later step are added here as it is built.</p>
+</div>
+
+<h2>4. Review checklist</h2>
+<div class="box">
+  <ul class="check">
+    <li>With a game in borderless window, press <code>Ctrl+`</code>. The game dims to about a quarter of its brightness and Windows Terminal fills the screen except a 50px margin all round.</li>
+    <li>Type a command in Terminal. It appears at once, with no click needed.</li>
+    <li>Press <code>Ctrl+`</code> again. The panel goes, the game is back in front and its mouse lock works without a click.</li>
+    <li>Click the dimmed margin instead of the hotkey. It closes the same way.</li>
+    <li>Check: open Terminal over the borderless game 20 times in a row and type a command each time. No focus is left on the wrong window and there is no visible flicker.</li>
+    <li>No Terminal button appears in the taskbar while the panel is closed.</li>
+    <li>Change the hotkey and the dim level in Settings. Both apply straight away and survive a restart of Glaude.</li>
+    <li>Try a game in true exclusive fullscreen. The panel does not show over it; this is the stated limit, not a bug.</li>
+  </ul>
+  <div class="notes" data-key="review"><label>Your notes on the review</label><textarea></textarea></div>
+</div>
+</main>
+
+<script>
+  const KEY = "glaude-milestone-1-notes";
+  const saved = JSON.parse(localStorage.getItem(KEY) || "{}");
+  const boxes = [...document.querySelectorAll(".notes")];
+  for (const box of boxes) {
+    const area = box.querySelector("textarea");
+    area.value = saved[box.dataset.key] || "";
+    area.addEventListener("input", () => {
+      saved[box.dataset.key] = area.value;
+      localStorage.setItem(KEY, JSON.stringify(saved));
+    });
+  }
+  document.getElementById("copy").addEventListener("click", async (e) => {
+    const lines = boxes
+      .filter((b) => b.querySelector("textarea").value.trim())
+      .map((b) => `[${b.querySelector("label").textContent.replace("Your notes on ", "")}]\n${b.querySelector("textarea").value.trim()}`);
+    const text = lines.length ? "Milestone 1 notes:\n\n" + lines.join("\n\n") : "Milestone 1 notes: none";
+    await navigator.clipboard.writeText(text);
+    e.target.textContent = "Copied";
+    setTimeout(() => (e.target.textContent = "Copy my notes"), 1500);
+  });
+  document.getElementById("clear").addEventListener("click", () => {
+    if (!confirm("Clear all your notes on this page?")) return;
+    localStorage.removeItem(KEY);
+    for (const b of boxes) b.querySelector("textarea").value = "";
+    for (const k in saved) delete saved[k];
+  });
+</script>
+</body>
+</html>

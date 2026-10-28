@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glaude: the bible</title>
+<style>
+  :root { --ground: #f4f5f6; --surface: #ffffff; --raised: #e9ebee; --ink: #1b1d21; --soft: #5a606b; --accent: #0b6e5f; --warn: #a3471b; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ground); color: var(--ink); font: 17px/1.55 "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 920px; margin: 0 auto; padding: 48px 24px 96px; }
+  h1 { font-size: 2.4rem; line-height: 1.15; margin: 0 0 8px; }
+  h2 { font-size: 1.5rem; margin: 64px 0 16px; }
+  h3 { font-size: 1.15rem; margin: 28px 0 8px; }
+  p { margin: 0 0 12px; }
+  .status { color: var(--warn); font-weight: 600; margin-bottom: 32px; }
+  .box { background: var(--surface); border-radius: 10px; padding: 20px 24px; margin: 16px 0; }
+  .first { background: var(--raised); }
+  .first ul { margin: 8px 0 0; padding-left: 20px; }
+  table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: 10px; overflow: hidden; font-size: 0.95rem; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 14px; }
+  th { background: var(--raised); }
+  tr:nth-child(even) td { background: #f8f9fa; }
+  .ms-head { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; flex-wrap: wrap; }
+  .ms-head h3 { margin: 0; }
+  .state { color: var(--soft); font-weight: 600; }
+  .state.now { color: var(--accent); }
+  .state.done { color: var(--soft); text-decoration: line-through; }
+  ul.check { list-style: none; padding: 0; margin: 12px 0 0; }
+  ul.check li { padding: 4px 0 4px 30px; position: relative; }
+  ul.check li::before { content: ""; position: absolute; left: 0; top: 8px; width: 16px; height: 16px; border-radius: 4px; background: var(--raised); }
+  ul.check li.ticked::before { background: var(--accent); }
+  ul.check li.ticked { color: var(--soft); }
+  .why { color: var(--soft); font-size: 0.95rem; }
+  ol.pillars li { margin-bottom: 10px; }
+  .notes { margin-top: 16px; }
+  .notes label { display: block; font-size: 0.9rem; color: var(--soft); margin-bottom: 4px; }
+  .notes textarea { width: 100%; min-height: 64px; padding: 10px 12px; border: 0; border-radius: 8px; background: var(--ground); color: var(--ink); font: inherit; font-size: 0.95rem; resize: vertical; }
+  .notes textarea:focus { outline: 2px solid var(--accent); }
+  .bar { position: sticky; top: 0; z-index: 2; background: var(--ink); color: #fff; padding: 12px 24px; display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .bar span { font-size: 0.95rem; }
+  .bar button { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 9px 16px; font: inherit; font-size: 0.95rem; cursor: pointer; }
+  .bar button.plain { background: transparent; color: #cfd3d9; }
+  nav { margin: 24px 0 0; color: var(--soft); font-size: 0.95rem; }
+  nav a { color: var(--accent); margin-right: 14px; white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <span>Write in any notes box. Then press Copy my notes and paste them to Claude.</span>
+  <span><button class="plain" id="clear">Clear notes</button> <button id="copy">Copy my notes</button></span>
+</div>
+
+<main>
+<h1>Glaude: the bible</h1>
+<p class="status">Status: approved 2026-10-28. Milestone 1 in progress.</p>
+
+<div class="box first">
+  <strong>Read this first</strong>
+  <ul>
+    <li>This page is THE reference for the project. If another doc or memory disagrees, this wins; Claude fixes the other one.</li>
+    <li>Section 3 is what doolecg has settled. Claude does not reopen those unless asked.</li>
+    <li>Section 4 is the milestone order. Claude works only on the milestone marked in progress.</li>
+    <li>A new idea never goes into the milestone in progress. Section 6 says where it goes in section 7.</li>
+    <li>Every change to sections 3, 4 or 7 gets a line in section 8.</li>
+    <li>To change anything, write in the notes box under it, press Copy my notes, and paste to Claude. Notes stay in this browser until you clear them.</li>
+  </ul>
+  <nav>
+    <a href="#s1">1 What it is</a><a href="#s2">2 Pillars</a><a href="#s3">3 Settled</a><a href="#s4">4 Milestones</a><a href="#s5">5 How a milestone runs</a><a href="#s6">6 Where ideas go</a><a href="#s7">7 Idea map</a><a href="#s8">8 Change log</a>
+  </nav>
+</div>
+
+<h2 id="s1">1. What it is</h2>
+<div class="box">
+  <p>Glaude is a small Windows tray app. You press one hotkey while playing a game (default <code>Ctrl+`</code>) and an AI coding app opens in a panel over the dimmed game. Press the hotkey again and you are back in the game, with no Alt-Tab. The first app is Windows Terminal; later milestones add Claude, T3 Code, OpenCode and any program you choose.</p>
+  <p>It shows the app's real window, focused so you can type. It does not draw inside the game: no DirectX hook, no injected code. That keeps it safe with anti-cheat, and it means it cannot show over true exclusive fullscreen. It is for Windows only for now, and for one person's own use first. The full design is in <code>docs/overlay-design.html</code>.</p>
+  <div class="notes" data-key="s1"><label>Your notes on section 1</label><textarea></textarea></div>
+</div>
+
+<h2 id="s2">2. Pillars</h2>
+<p>Every feature must serve at least one.</p>
+<div class="box">
+  <ol class="pillars">
+    <li><strong>One key in, one key out.</strong> Going from game to app and back is a single hotkey and focus returns to the game on its own. A feature that adds a step to that loop does not belong.</li>
+    <li><strong>Leave the game alone.</strong> Nothing is injected or hooked, so anti-cheat has nothing to object to. We state the limits (no exclusive fullscreen) instead of working around them.</li>
+    <li><strong>The app stays as it is.</strong> Glaude shows the app's own window and does not restyle it. The only Glaude pieces on screen are the dim and, from milestone 2, the rail.</li>
+    <li><strong>Quiet and lean.</strong> It runs nothing you did not ask for, registers only its own shortcuts and keeps little state. Apps start on first open, not at launch.</li>
+  </ol>
+  <div class="notes" data-key="s2"><label>Your notes on the pillars</label><textarea></textarea></div>
+</div>
+
+<h2 id="s3">3. Settled decisions</h2>
+<table>
+  <tr><th>Date</th><th>Decision</th><th>Why</th></tr>
+  <tr><td>2026-10-28</td><td>Standalone app in its own repo, Windows only for now.</td><td>The Win32 bits are small and Linux (Wayland layer-shell) is a different design. See design.md.</td></tr>
+  <tr><td>2026-10-28</td><td>Show the app's real window, focused, not a picture of it.</td><td>You can type straight away and the app needs no changes.</td></tr>
+  <tr><td>2026-10-28</td><td>Panel fills the game's monitor minus 50px on every side, in display-scaled pixels. The dimmed game shows in the margin.</td><td>Same look at 1080p and 4K, and the margin shows the game is still there.</td></tr>
+  <tr><td>2026-10-28</td><td>No hook, no injection. True exclusive fullscreen is not supported and the settings page says so.</td><td>Hooks upset anti-cheat. Borderless and Fullscreen Optimisations modes, which cover most games, work.</td></tr>
+  <tr><td>2026-10-28</td><td>Tauri 2, Rust, Svelte 5 with Vite. The <code>windows</code> crate for the Win32 calls.</td><td>Same stack as Notifi, so the patterns carry over.</td></tr>
+  <tr><td>2026-10-28</td><td>Default hotkey <code>Ctrl+`</code>, rebindable in Settings. Esc does not close the overlay.</td><td>Free in games and in all four apps. Steam owns Shift+Tab and Claude Code uses Esc to stop a reply.</td></tr>
+  <tr><td>2026-10-28</td><td>Dim level 72%, shade colour <code>#0b0d10</code>.</td><td>The game stays readable as context and the panel stands out.</td></tr>
+  <tr><td>2026-10-28</td><td>Apps start on first open, not when Glaude starts.</td><td>Nothing runs that you did not ask for. The wait is a second or two, once.</td></tr>
+  <tr><td>2026-10-28</td><td>"Glaude" is the shipped name. The About page spells it out once.</td><td>doolecg confirmed it.</td></tr>
+  <tr><td>2026-10-28</td><td>Look: one ground, one ink, teal <code>#2fbfa8</code> as the only accent, Segoe UI, fade in 120ms and out 100ms, no glow or blur.</td><td>Follows the dark style already approved in the design bank.</td></tr>
+  <tr><td>2026-10-28</td><td>MIT licence, copyright 2026 doolecg. Work on <code>dev-0.1.0</code>, plain tags for releases.</td><td>Standing rule for every repo.</td></tr>
+  <tr><td>2026-10-28</td><td>Milestone 1: parked app windows are hidden (<code>SW_HIDE</code>) as well as moved off-screen.</td><td>A hidden window leaves no taskbar button. Off-screen alone would leave one.</td></tr>
+  <tr><td>2026-10-28</td><td>Milestone 1: the hotkey uses the official <code>tauri-plugin-global-shortcut</code>, not raw <code>windows</code> crate calls.</td><td>Less code to keep, and it is the supported way in Tauri.</td></tr>
+</table>
+<div class="box"><div class="notes" data-key="s3" style="margin-top:0"><label>Your notes on settled decisions</label><textarea></textarea></div></div>
+
+<h2 id="s4">4. Milestone map</h2>
+<p>Trunk before branches: first a crude skeleton of the whole project, end to end, then depth passes that make each part good. A fun/usefulness review sits after the skeleton. Ticked items (class="ticked") are built and checked in the running app. State is Planned, In progress (class="state now"), or Done (class="state done").</p>
+
+<div class="box">
+  <div class="ms-head"><h3>Milestone 1 "Proof"</h3><span class="state now">In progress: approved 2026-10-28</span></div>
+  <p class="why">Guide: <code>docs/milestone-1-guide.html</code></p>
+  <ul class="check">
+    <li>Tray app; the hotkey shows and hides the shade over a borderless game, and focus returns to the game.</li>
+    <li>One app (Windows Terminal) parked, shown in the panel, focused, parked again.</li>
+    <li>Settings: hotkey, one app, dim level.</li>
+    <li>Check: open Terminal over a borderless game 20 times in a row, type a command each time, no focus left on the wrong window, no visible flicker.</li>
+  </ul>
+  <div class="notes" data-key="m1"><label>Your notes on milestone 1</label><textarea></textarea></div>
+</div>
+
+<div class="box">
+  <div class="ms-head"><h3>Milestone 2 "Pick your app"</h3><span class="state">Planned</span></div>
+  <ul class="check">
+    <li>Several apps, the rail, switch keys (<code>Ctrl+1</code> to <code>Ctrl+9</code>).</li>
+    <li>Presets for Claude, T3 Code and OpenCode. (Attach to a running app moved into milestone 1.)</li>
+    <li>Updater, release notes, About page with the disclaimer, first release 0.1.0.</li>
+  </ul>
+  <div class="notes" data-key="m2"><label>Your notes on milestone 2</label><textarea></textarea></div>
+</div>
+
+<h2 id="s5">5. How a milestone runs</h2>
+<div class="box">
+  <ol>
+    <li>Start: Claude writes <code>docs/milestone-N-guide.html</code> (goal, parts, out of scope) and asks doolecg every question it needs in one bundle.</li>
+    <li>doolecg approves the guide. Claude marks it "In progress: approved" with the date here and in <code>CLAUDE.md</code>.</li>
+    <li>Claude builds in small steps. After each step, its test steps go in the guide.</li>
+    <li>End: one review checklist in the guide for doolecg. Fixes from it jump the queue.</li>
+    <li>Close: Claude marks it done here and in <code>CLAUDE.md</code>, ticks its items in section 4, updates <code>docs/systems.md</code>, records decisions in section 3 and <code>docs/design.md</code>, and adds a line to section 8.</li>
+  </ol>
+  <div class="notes" data-key="s5"><label>Your notes on how a milestone runs</label><textarea></textarea></div>
+</div>
+
+<h2 id="s6">6. Where ideas go</h2>
+<div class="box">
+  <ul>
+    <li>Fits a planned milestone: add it to that milestone in section 7.</li>
+    <li>Needs something not built yet: park it under the milestone that builds that thing.</li>
+    <li>Serves no pillar: park it under "Maybe never" with one line on why.</li>
+    <li>Changes a settled decision: ask doolecg; it is not decided until they say so.</li>
+    <li>Never slip it into the milestone in progress, however small.</li>
+  </ul>
+</div>
+
+<h2 id="s7">7. Idea map</h2>
+<div class="box">
+  <h3 style="margin-top:0">After milestone 2 (no milestone planned yet)</h3>
+  <ul>
+    <li>Peek mode: a live DWM thumbnail of the app with no focus change, for a glance while a cutscene plays. Notifi has the thumbnail code. The answer if games that fight for the foreground turn out common (from the design, 2026-10-28).</li>
+    <li>A dot on the rail when an agent finishes a task, fed by Notifi's agent watchers (from the design, 2026-10-28).</li>
+    <li>Controller: hold the Guide button to open (from the design, 2026-10-28).</li>
+    <li>Side-panel layout (from the design, 2026-10-28).</li>
+    <li>Margin size as a setting (from the design, 2026-10-28).</li>
+    <li>Per-game profiles (from the design, 2026-10-28).</li>
+    <li>Linux. Wayland layer-shell is a different design (from the design, 2026-10-28).</li>
+  </ul>
+  <h3>Maybe never</h3>
+  <ul>
+    <li>Nothing yet.</li>
+  </ul>
+  <div class="notes" data-key="s7"><label>Your notes on the idea map (move things, add ideas)</label><textarea></textarea></div>
+</div>
+
+<h2 id="s8">8. Change log</h2>
+<div class="box">
+  <ul>
+    <li>2026-10-28: page created from the approved overlay design. Section 10 questions settled with the recommended answers: hotkey <code>Ctrl+`</code>, dim 72%, apps start on first open, "Glaude" is the shipped name.</li>
+    <li>2026-10-28: hotkey moved to Glaude's own RegisterHotKey code (the plugin never fired on a UK keyboard). Browse for a program and pick a running app pulled into milestone 1 at doolecg's request.</li>
+    <li>2026-10-28: milestone 1 started. Two deviations recorded in section 3: parked windows are also hidden, and the hotkey uses <code>tauri-plugin-global-shortcut</code>.</li>
+    <li>2026-10-28: run configs, LICENSE and README were added at project setup, so run configs are no longer a milestone 2 item.</li>
+  </ul>
+</div>
+</main>
+
+<script>
+  const KEY = "glaude-bible-notes";
+  const saved = JSON.parse(localStorage.getItem(KEY) || "{}");
+  const boxes = [...document.querySelectorAll(".notes")];
+  for (const box of boxes) {
+    const area = box.querySelector("textarea");
+    area.value = saved[box.dataset.key] || "";
+    area.addEventListener("input", () => {
+      saved[box.dataset.key] = area.value;
+      localStorage.setItem(KEY, JSON.stringify(saved));
+    });
+  }
+  document.getElementById("copy").addEventListener("click", async (e) => {
+    const lines = boxes
+      .filter((b) => b.querySelector("textarea").value.trim())
+      .map((b) => `[${b.querySelector("label").textContent.replace("Your notes on ", "")}]\n${b.querySelector("textarea").value.trim()}`);
+    const text = lines.length ? "Bible notes:\n\n" + lines.join("\n\n") : "Bible notes: none";
+    await navigator.clipboard.writeText(text);
+    e.target.textContent = "Copied";
+    setTimeout(() => (e.target.textContent = "Copy my notes"), 1500);
+  });
+  document.getElementById("clear").addEventListener("click", () => {
+    if (!confirm("Clear all your notes on this page?")) return;
+    localStorage.removeItem(KEY);
+    for (const b of boxes) b.querySelector("textarea").value = "";
+    for (const k in saved) delete saved[k];
+  });
+</script>
+</body>
+</html>
