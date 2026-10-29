@@ -23,7 +23,9 @@
   <a href="#features">Features</a> ·
   <a href="#where-it-works">Where it works</a> ·
   <a href="#what-glaude-does-on-your-machine">What it does on your machine</a> ·
-  <a href="#development">Development</a>
+  <a href="#privacy">Privacy</a> ·
+  <a href="#development">Development</a> ·
+  <a href="https://github.com/doolecg/Glaude/releases">Releases</a>
 </p>
 
 <p align="center">
@@ -42,13 +44,13 @@ You start an agent on a long task, then start a game while it works. Now you wan
 
 ## Quick start
 
-There is no installer yet. Build it from source:
+Windows 10 or 11.
 
-1. Install [Node.js](https://nodejs.org), [Rust](https://rustup.rs) and the [Tauri 2 requirements for Windows](https://tauri.app/start/prerequisites/).
-2. In this folder run `npm install`, then `npm run dev`.
-3. Left-click the Glaude tray icon, press **Pick a running app** and choose your agent's window.
+1. Download the `.msi` installer from [Releases](https://github.com/doolecg/Glaude/releases) and run it. Windows asks for admin permission to install.
+2. Left-click the Glaude tray icon and press **Pick a running app** to add your agent's window (or **Browse for a program**).
+3. In a game, press **Ctrl+`** (the key above Tab) to open the panel. Press it again to go back.
 
-That's it. In a game, press **Ctrl+`** (the key above Tab) to open the panel and press it again to go back.
+That's it. Glaude keeps itself up to date from the same Releases page. Read [What Glaude does on your machine](#what-glaude-does-on-your-machine) first.
 
 ## Why Glaude
 
@@ -58,18 +60,21 @@ That's it. In a game, press **Ctrl+`** (the key above Tab) to open the panel and
 
 **The app stays as it is.** What you see is the app's own window, not a copy or a restyle. You type into it as normal, and Esc stays with the app (Claude Code and OpenCode use Esc to stop a reply).
 
-**Quick every time after the first.** Between opens the app keeps running out of sight, off-screen and off the taskbar. Opening takes a few milliseconds.
+**Your apps stay yours.** Glaude borrows a window only while it is in the panel. Close the overlay and every app is back on your desktop where you left it, ready to use as normal. Opening takes a few milliseconds.
 
 ## Features
 
 | Capability | What you get |
 | --- | --- |
 | Hotkey overlay | Ctrl+` opens the app in a panel 50px in from every edge of the game's monitor, over the game dimmed to 72% |
-| Pick a running app | Choose any open window from a list; Glaude uses that window from the next open |
-| Browse for a program | Pick any program (or its shortcut); Glaude starts it the first time you open the overlay |
-| One-copy apps | Apps that only run once, like Claude and T3 Code, are taken over in their existing window instead of failing to start |
+| Several apps, one strip | Add T3 Code, Chrome, Files, Discord or anything else; a strip along the top of the panel switches between them with a click |
+| Back to the desktop as normal | Closing or switching puts each window back exactly where it was on your desktop, at its size, visible and on the taskbar |
+| Pick a running app | Choose any open window from a list; Glaude adds it to the strip and uses that window |
+| Browse for a program | Pick any program (or its shortcut); Glaude starts it the first time it is needed |
+| Never a second copy | An app that is already open, even hidden in the tray, is shown in its own window; Glaude only starts apps that are not open at all |
 | Any keyboard layout | The hotkey is stored by key position, so Ctrl+` is the key above Tab on UK and US keyboards alike |
-| Settings, applied live | Rebind the hotkey by pressing it, set the dim level, change the app; saved as you go |
+| Settings, applied live | Rebind the hotkey by pressing it, set the dim level, change the apps; saved as you go |
+| Updates | Checks GitHub at start and every few hours, downloads in the background, installs when you press Install or quit; release notes in Settings |
 | Multi-monitor and scaling | The panel opens on the monitor the game is on, measured in display-scaled pixels so it looks the same at 1080p and 4K |
 
 ## Where it works
@@ -82,18 +87,25 @@ That's it. In a game, press **Ctrl+`** (the key above Tab) to open the panel and
 
 Some anti-cheat games pull focus back every frame. Glaude does not fight them for it.
 
-Not built yet: several apps at once with a switcher strip, presets for Claude, T3 Code and OpenCode, an installer with automatic updates, and the About page. The plan is in the [design](docs/overlay-design.html) and the [bible](docs/bible.html).
+Not built yet: one-click presets for Claude, T3 Code and OpenCode. The plan is in the [design](docs/overlay-design.html) and the [bible](docs/bible.html).
 
-## What Glaude does on your machine
+Read this before you install. By using Glaude you agree to it doing the following.
 
 - **Registers one global hotkey** (Ctrl+` unless you change it), and lets go of it while you record a new one.
-- **Starts the program you chose**, the first time you open the overlay, with the arguments you gave.
-- **Moves, shows and hides that program's window.** Between opens it is moved off-screen and hidden. When you quit Glaude, or choose a different app, the window is put back on screen as a normal window.
-- **Keeps its settings** in `%APPDATA%\io.glaude.app\settings.json`.
+- **Starts the programs you chose**, only when one is not open at all, with the arguments you gave. It never starts a second copy of a program that is already open.
+- **Moves other programs' windows.** The app you pick is moved into the panel above the game and given the keyboard. When you switch away or close, it goes back to the exact place, size and state it had on your desktop; an app that was hidden in the tray is hidden again. Glaude does not read, change or save anything inside those programs.
+- **Installs its own updates.** It downloads new versions of itself from GitHub and runs the Windows installer when you press Install or quit Glaude. The installer is checked against Glaude's signing key first and refused if it does not match. Windows shows its admin prompt before each install.
+- **Keeps its settings** in `%APPDATA%\io.glaude.app\settings.json`: the hotkey, the dim level and your list of apps.
+
+Glaude never draws inside or changes a game. Some games' anti-cheat may still dislike other windows taking focus; check a game's rules if you are unsure.
 
 ## Privacy
 
-Nothing leaves your computer. Glaude makes no network connections: no account, no analytics, no update checks yet. The AI apps you open in it send your prompts and files to their own services under their own terms, and Glaude neither sees nor controls that.
+Glaude has no account, no analytics, no tracking and no crash reporting. Your settings stay on your computer. Its only connection is:
+
+- **Update checks.** At start and every few hours Glaude asks GitHub (`github.com`) for the latest release and downloads the installer from there when there is a newer one. GitHub sees your IP address and that you run Glaude, under GitHub's own privacy terms.
+
+The apps you open in Glaude (T3 Code, Claude, Chrome, Discord and so on) send your prompts, files and messages to their own services under their own terms. Glaude neither sees nor controls that traffic.
 
 ## Development
 
@@ -107,16 +119,22 @@ The code is small: `src-tauri/src/overlay.rs` (shade and app window), `hotkey.rs
 
 ## Credits
 
-The Windows tricks Glaude uses (showing a window without taking focus, parking a window off-screen, letting go of shortcuts while another window needs them) come from my other project, Notifi. Over the Hill, shown in the screenshots, belongs to its makers. Glaude is not connected with it.
+The Windows tricks Glaude uses (showing a window without taking focus, letting go of shortcuts while another window needs them) come from my other project, Notifi. Over the Hill, shown in the screenshots, belongs to its makers. Glaude is not connected with it.
 
 ## Licence
 
-MIT. See [LICENSE](LICENSE). Copyright (c) 2026 doolecg.
+Glaude is released under the [MIT Licence](LICENSE). Copyright (c) 2026 doolecg.
+
+Glaude is built on open-source software (Tauri, Svelte, the `windows` crate and the packages they use), each under its own licence. Their copyright notices and licence texts are in [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt), which the installer also places next to the program with LICENSE. `npm run notices` regenerates it from the dependency list.
 
 ## Disclaimer
 
 This software is provided "as is", without warranty of any kind, as set out in the [LICENSE](LICENSE). To the extent permitted by law, the authors are not liable for any loss or damage from using it, including lost data, lost work or damage to files or projects. Nothing here limits liability that cannot be limited by law, such as for death or personal injury caused by negligence.
 
-Not affiliated with or endorsed by Anthropic, T3 Code, OpenCode or the makers of any game. Their names are used only to say what Glaude works with. Glaude only opens other programs. The AI apps you run in it can be wrong, so check their output before relying on it, and read their own terms for what data they send.
+Glaude moves and focuses other programs' windows. It is not responsible for what those programs do, and it cannot guarantee how any game or its anti-cheat reacts to another window taking focus. Some games may not allow it; check a game's terms before using Glaude with it, especially in online or competitive play.
+
+Not affiliated with or endorsed by Anthropic, Microsoft, Google, Discord, Valve, the makers of T3 Code or OpenCode, or the makers of any game. Claude is a trademark of Anthropic; Windows and File Explorer of Microsoft; Chrome of Google; Discord of Discord Inc.; Steam of Valve; Over the Hill and every other game named or shown are trademarks of their owners. Names and screenshots are used only to show what Glaude works with.
+
+The AI apps you run in Glaude send your prompts and files to their own services under your account and their terms. AI output can be wrong; check it before relying on it.
 
 Back up your work before using it. You use it at your own risk.

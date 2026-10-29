@@ -70,7 +70,7 @@
   <ul class="check">
     <li class="ticked"><strong>Tray app:</strong> Glaude runs from the tray and has a Settings window opened from the tray icon.</li>
     <li class="ticked"><strong>Hotkey:</strong> <code>Ctrl+`</code> by default, registered with <code>tauri-plugin-global-shortcut</code>. Pressed once it opens the overlay, pressed again it closes it.</li>
-    <li class="ticked"><strong>Shade:</strong> a borderless, transparent, always-on-top window over the game's monitor, dimmed to 72% by default. A click on the dim closes the overlay. Fade in 120ms, fade out 100ms.</li>
+    <li class="ticked"><strong>Shade:</strong> a borderless, transparent, always-on-top window over the game's monitor, dimmed to 72% by default. A click on the dim closes the overlay. No fades: it cuts in and out at once.</li>
     <li class="ticked"><strong>One app:</strong> Windows Terminal is started on first open, found by its first top-level window, and parked when closed. Parked means moved off-screen and hidden (<code>SW_HIDE</code>), so it leaves no taskbar button. On open it moves to the panel (the monitor minus 50px on every side), goes above the shade and takes focus.</li>
     <li class="ticked"><strong>Focus handback:</strong> on open Glaude remembers the foreground window (the game). On close it parks the app, hides the shade and gives the foreground back to the game, so the game's mouse lock returns on its own.</li>
     <li><strong>Settings:</strong> hotkey, the one app (path and arguments), and dim level. Applied live and saved on change.</li>

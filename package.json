@@ -9,7 +9,8 @@
     "ui:dev": "vite --config ui/vite.config.js",
     "ui:build": "vite build --config ui/vite.config.js",
     "tauri": "tauri",
-    "main": "node scripts/run-main.mjs"
+    "main": "node scripts/run-main.mjs",
+    "notices": "node scripts/third-party-notices.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4"

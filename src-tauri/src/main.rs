@@ -3,6 +3,7 @@
 mod hotkey;
 mod overlay;
 mod settings;
+mod updater;
 mod win;
 
 use hotkey::Hotkey;
@@ -53,7 +54,7 @@ fn save(app: &AppHandle, settings: Settings) -> Result<(), String> {
         }
         *app.state::<HotkeyError>().0.lock().unwrap() = None;
     }
-    if settings.app != old.app {
+    if settings.apps != old.apps {
         overlay::release(app);
     }
     overlay::set_dim(app, settings.dim);
@@ -77,28 +78,30 @@ fn apps_running() -> Vec<overlay::Running> {
     overlay::running()
 }
 
-/// Makes the program in this window the app, and uses the window itself from the next open.
+/// Adds the program in this window to the apps, using the window itself.
 #[tauri::command]
-fn app_attach(app: AppHandle, hwnd: isize) -> Result<AppEntry, String> {
+fn app_attach(app: AppHandle, hwnd: isize) -> Result<Settings, String> {
     if !win::alive(hwnd) {
         return Err("That window has closed.".into());
     }
-    let entry = entry_for(&win::exe_path(pid_of(hwnd)));
-    save(&app, Settings { app: entry.clone(), ..app.state::<Store>().get() })?;
-    overlay::adopt(&app, hwnd);
-    Ok(entry)
+    let mut settings = app.state::<Store>().get();
+    settings.apps.push(AppEntry { window_class: win::class_of(hwnd), ..entry_for(&win::exe_path(pid_of(hwnd))) });
+    save(&app, settings.clone())?;
+    overlay::adopt(&app, settings.apps.len() - 1, hwnd);
+    Ok(settings)
 }
 
-/// Shows the Windows open dialog and makes the chosen program the app.
+/// Shows the Windows open dialog and adds the chosen program to the apps.
 #[tauri::command]
-async fn app_browse(app: AppHandle, window: WebviewWindow) -> Result<Option<AppEntry>, String> {
+async fn app_browse(app: AppHandle, window: WebviewWindow) -> Result<Option<Settings>, String> {
     let owner = window.hwnd().map(|h| h.0 as isize).unwrap_or(0);
     let Some(path) = tauri::async_runtime::spawn_blocking(move || win::pick_exe(owner)).await.map_err(|e| e.to_string())? else {
         return Ok(None);
     };
-    let entry = entry_for(&path);
-    save(&app, Settings { app: entry.clone(), ..app.state::<Store>().get() })?;
-    Ok(Some(entry))
+    let mut settings = app.state::<Store>().get();
+    settings.apps.push(entry_for(&path));
+    save(&app, settings.clone())?;
+    Ok(Some(settings))
 }
 
 fn pid_of(h: isize) -> u32 {
@@ -109,7 +112,7 @@ fn pid_of(h: isize) -> u32 {
 fn entry_for(path: &str) -> AppEntry {
     let file = win::file_name(path).to_string();
     let name = file.strip_suffix(".exe").or(file.strip_suffix(".EXE")).unwrap_or(&file).to_string();
-    AppEntry { name, exe: path.to_string(), args: String::new(), window_exe: file }
+    AppEntry { name, exe: path.to_string(), args: String::new(), window_exe: file, window_class: String::new() }
 }
 
 #[tauri::command]
@@ -117,18 +120,39 @@ fn overlay_close(app: AppHandle) {
     std::thread::spawn(move || overlay::close(&app));
 }
 
+#[tauri::command]
+fn overlay_switch(app: AppHandle, index: usize) {
+    overlay::switch(&app, index);
+}
+
+/// The tray menu's update line, enabled only while an update is downloaded and waiting.
+struct UpdateItem(MenuItem<tauri::Wry>);
+
+/// Shows in the tray that an update is ready to install, or that none is.
+pub fn tray_update_ready(app: &AppHandle, version: Option<&str>) {
+    if let Some(item) = app.try_state::<UpdateItem>() {
+        let _ = item.0.set_text(version.map_or("No update waiting".to_string(), |v| format!("Install update {v}")));
+        let _ = item.0.set_enabled(version.is_some());
+    }
+    if let Some(tray) = app.tray_by_id("main") {
+        let _ = tray.set_tooltip(Some(version.map_or("Glaude".to_string(), |v| format!("Glaude: update {v} ready"))));
+    }
+}
+
 fn tray(app: &AppHandle) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "Open overlay", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
+    let update = MenuItem::with_id(app, "update", "No update waiting", false, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit Glaude", true, None::<&str>)?;
-    TrayIconBuilder::new()
+    TrayIconBuilder::with_id("main")
         .icon(app.default_window_icon().cloned().expect("app icon"))
         .tooltip("Glaude")
-        .menu(&Menu::with_items(app, &[&open, &settings, &quit])?)
+        .menu(&Menu::with_items(app, &[&open, &settings, &update, &quit])?)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, e| match e.id().as_ref() {
             "open" => overlay::toggle(app),
             "settings" => open_settings(app),
+            "update" => updater::update_install(app.clone()),
             "quit" => app.exit(0),
             _ => {}
         })
@@ -138,11 +162,13 @@ fn tray(app: &AppHandle) -> tauri::Result<()> {
             }
         })
         .build(app)?;
+    app.manage(UpdateItem(update));
     Ok(())
 }
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             settings_get,
             settings_set,
@@ -150,7 +176,12 @@ fn main() {
             apps_running,
             app_attach,
             app_browse,
-            overlay_close
+            overlay_close,
+            overlay_switch,
+            updater::update_status,
+            updater::update_check,
+            updater::update_install,
+            updater::update_notes
         ])
         .setup(|app| {
             let store = Store::load(app.handle());
@@ -161,7 +192,9 @@ fn main() {
             app.manage(HotkeyError(Mutex::new(hotkey.set(Some(&accel)).err())));
             app.manage(hotkey);
             overlay::create_shade(app.handle())?;
+            app.manage(updater::Updater::new(app.package_info().version.to_string()));
             tray(app.handle())?;
+            updater::start(app.handle());
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -169,6 +202,8 @@ fn main() {
         .run(|app, event| {
             if let RunEvent::Exit = event {
                 overlay::release(app);
+                // An update downloaded but not yet installed goes in now, as Glaude quits.
+                let _ = updater::install(app);
             }
         });
 }

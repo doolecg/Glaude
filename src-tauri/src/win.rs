@@ -4,19 +4,21 @@ use windows::core::{BOOL, PCWSTR, PWSTR};
 use windows::Win32::System::Com::{CoInitializeEx, COINIT_APARTMENTTHREADED};
 use windows::Win32::UI::Controls::Dialogs::{GetOpenFileNameW, OFN_FILEMUSTEXIST, OFN_NOCHANGEDIR, OFN_PATHMUSTEXIST, OPENFILENAMEW};
 use windows::Win32::Foundation::{CloseHandle, HWND, LPARAM, RECT};
+use windows::Win32::Graphics::Dwm::{DwmFlush, DwmGetWindowAttribute, DWMWA_CLOAKED};
 use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MonitorFromPoint, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST, MONITOR_DEFAULTTOPRIMARY};
 use windows::Win32::System::Threading::{
     AttachThreadInput, GetCurrentThreadId, OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
 };
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::WindowsAndMessaging::{
-    BringWindowToTop, EnumWindows, GetForegroundWindow, GetWindow, GetWindowLongW, GetWindowRect, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsIconic,
-    IsWindow, IsWindowVisible, IsZoomed, SetForegroundWindow, SetWindowPos, ShowWindow, GWL_EXSTYLE, GW_OWNER, HWND_NOTOPMOST, HWND_TOPMOST,
-    SWP_NOACTIVATE, SWP_NOSIZE, SWP_SHOWWINDOW, SW_HIDE, SW_RESTORE, SW_SHOWNA, WS_EX_TOOLWINDOW,
+    BringWindowToTop, EnumWindows, GetClassNameW, GetForegroundWindow, GetWindow, GetWindowLongW, GetWindowPlacement, GetWindowRect, GetWindowTextLengthW,
+    GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, IsZoomed, SetForegroundWindow, SetWindowPlacement, SetWindowPos,
+    ShowWindow, GWL_EXSTYLE, GW_OWNER, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SW_HIDE, SW_MINIMIZE,
+    SW_SHOWMAXIMIZED, SW_SHOWMINIMIZED, SW_SHOWMINNOACTIVE, SW_SHOWNOACTIVATE, SWP_NOZORDER, WINDOWPLACEMENT, WS_EX_TOOLWINDOW,
 };
 
-/// Off-screen spot an app window waits in between opens (Notifi's PARKED).
-const PARKED: i32 = -30_000;
+/// Windows of the shell itself (the desktop and the taskbars), which belong to explorer.exe but are never an app.
+const SHELL_CLASSES: &[&str] = &["Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd"];
 
 #[derive(Clone, Copy, PartialEq)]
 pub struct Rect {
@@ -69,24 +71,53 @@ pub fn rect(h: isize) -> Rect {
     Rect { x: r.left, y: r.top, w: r.right - r.left, h: r.bottom - r.top }
 }
 
-/// Visible, titled, unowned top-level windows with their process ids: the windows a program opens for the user.
+/// Visible, titled, unowned top-level windows with their process ids, front to back: the windows a program opens for the user.
 pub fn top_windows() -> Vec<(isize, u32)> {
-    unsafe extern "system" fn each(h: HWND, out: LPARAM) -> BOOL {
-        let out = &mut *(out.0 as *mut Vec<(isize, u32)>);
+    windows_where(true)
+}
+
+/// Titled, unowned top-level windows that are hidden, such as an app closed to the tray. Most belong to helpers, so
+/// callers match them by exe and window class.
+pub fn hidden_windows() -> Vec<(isize, u32)> {
+    windows_where(false)
+}
+
+fn windows_where(visible: bool) -> Vec<(isize, u32)> {
+    struct Walk {
+        visible: bool,
+        out: Vec<(isize, u32)>,
+    }
+    unsafe extern "system" fn each(h: HWND, walk: LPARAM) -> BOOL {
+        let walk = &mut *(walk.0 as *mut Walk);
         let owned = GetWindow(h, GW_OWNER).is_ok_and(|o| !o.is_invalid());
         let tool = GetWindowLongW(h, GWL_EXSTYLE) as u32 & WS_EX_TOOLWINDOW.0 != 0;
-        if IsWindowVisible(h).as_bool() && !owned && !tool && GetWindowTextLengthW(h) > 0 {
+        let mut cloaked = 0u32;
+        let _ = DwmGetWindowAttribute(h, DWMWA_CLOAKED, &mut cloaked as *mut u32 as *mut _, 4);
+        let shell = SHELL_CLASSES.contains(&class_of(h.0 as isize).as_str());
+        // Cloaked windows are "visible" but not drawn: other virtual desktops and suspended Store apps.
+        let shown = IsWindowVisible(h).as_bool() && cloaked == 0;
+        if shown == walk.visible && !owned && !tool && !shell && GetWindowTextLengthW(h) > 0 {
             let mut pid = 0u32;
             GetWindowThreadProcessId(h, Some(&mut pid));
-            out.push((h.0 as isize, pid));
+            walk.out.push((h.0 as isize, pid));
         }
         true.into()
     }
-    let mut out: Vec<(isize, u32)> = Vec::new();
+    let mut walk = Walk { visible, out: Vec::new() };
     unsafe {
-        let _ = EnumWindows(Some(each), LPARAM(&mut out as *mut _ as isize));
+        let _ = EnumWindows(Some(each), LPARAM(&mut walk as *mut _ as isize));
     }
-    out
+    walk.out
+}
+
+pub fn class_of(h: isize) -> String {
+    let mut class = [0u16; 128];
+    let n = unsafe { GetClassNameW(hwnd(h), &mut class) };
+    String::from_utf16_lossy(&class[..n.max(0) as usize])
+}
+
+pub fn visible(h: isize) -> bool {
+    unsafe { IsWindowVisible(hwnd(h)).as_bool() }
 }
 
 /// Full path of a process's exe.
@@ -157,33 +188,82 @@ pub fn hide(h: isize) {
     }
 }
 
-/// Puts an app window over the shade at `r` and gives it the keyboard.
-pub fn show_in(h: isize, r: Rect) {
+/// Moves an app window to `r` without changing its place in the stack, so it stays under the shade (whose panel
+/// is solid) while it redraws at the new size. A maximised or minimised window is made normal through its
+/// placement, which skips Windows' restore animation; a hidden window is shown.
+pub fn place(h: isize, r: Rect) {
     unsafe {
         if IsZoomed(hwnd(h)).as_bool() || IsIconic(hwnd(h)).as_bool() {
-            let _ = ShowWindow(hwnd(h), SW_RESTORE);
+            let mut wp = WINDOWPLACEMENT { length: std::mem::size_of::<WINDOWPLACEMENT>() as u32, ..Default::default() };
+            let _ = GetWindowPlacement(hwnd(h), &mut wp);
+            wp.showCmd = SW_SHOWNOACTIVATE.0 as u32;
+            wp.rcNormalPosition = RECT { left: r.x, top: r.y, right: r.x + r.w, bottom: r.y + r.h };
+            let _ = SetWindowPlacement(hwnd(h), &wp);
         }
-        show_topmost(h, r);
-        let _ = ShowWindow(hwnd(h), SW_SHOWNA);
+        let _ = SetWindowPos(hwnd(h), None, r.x, r.y, r.w, r.h, SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+    }
+}
+
+/// Lifts a window `place` put under the shade above it, and gives it the keyboard.
+pub fn raise(h: isize) {
+    unsafe {
+        let _ = SetWindowPos(hwnd(h), Some(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
     }
     focus(h);
 }
 
-/// Moves an app window off-screen and hides it, so it keeps running but leaves no taskbar button.
-pub fn park(h: isize) {
-    unsafe {
-        let _ = SetWindowPos(hwnd(h), Some(HWND_NOTOPMOST), PARKED, PARKED, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
-        let _ = ShowWindow(hwnd(h), SW_HIDE);
+/// Waits for the screen to be redrawn `n` times, giving an app time to paint after a resize.
+pub fn wait_frames(n: u32) {
+    for _ in 0..n {
+        unsafe {
+            let _ = DwmFlush();
+        }
     }
 }
 
-/// Gives a parked window back as a normal window in the middle of the primary monitor (on quit, or when the app is changed).
-pub fn unpark(h: isize) {
-    let (m, _) = monitor_of(0);
-    let (w, hh) = (m.w * 3 / 5, m.h * 3 / 5);
+/// Where a window sits on the desktop: position, size, whether it is maximised or minimised, and whether it was
+/// hidden (an app closed to the tray).
+#[derive(Clone, Copy)]
+pub struct Placement {
+    wp: WINDOWPLACEMENT,
+    shown: bool,
+}
+
+pub fn placement(h: isize) -> Placement {
+    let mut wp = WINDOWPLACEMENT { length: std::mem::size_of::<WINDOWPLACEMENT>() as u32, ..Default::default() };
     unsafe {
-        let _ = SetWindowPos(hwnd(h), Some(HWND_NOTOPMOST), m.x + (m.w - w) / 2, m.y + (m.h - hh) / 2, w, hh, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+        let _ = GetWindowPlacement(hwnd(h), &mut wp);
     }
+    Placement { wp, shown: visible(h) }
+}
+
+/// Puts a window back where `p` says it was, as a normal desktop window just below `below` (the game), or at the
+/// top of the normal windows when there is no game; a window that was hidden is hidden again. It drops behind the
+/// game before it moves, so the move happens out of sight, and it is not activated, so the game keeps the keyboard.
+pub fn restore(h: isize, p: Placement, below: isize) {
+    let mut wp = p.wp;
+    wp.showCmd = if !p.shown {
+        SW_HIDE.0 as u32
+    } else if wp.showCmd == SW_SHOWMAXIMIZED.0 as u32 {
+        SW_SHOWMAXIMIZED.0 as u32
+    } else if [SW_SHOWMINIMIZED.0, SW_MINIMIZE.0, SW_SHOWMINNOACTIVE.0].contains(&(wp.showCmd as i32)) {
+        SW_SHOWMINNOACTIVE.0 as u32
+    } else {
+        SW_SHOWNOACTIVATE.0 as u32
+    };
+    let drop = || unsafe {
+        if alive(below) {
+            let _ = SetWindowPos(hwnd(h), Some(hwnd(below)), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        }
+    };
+    unsafe {
+        // Off the top layer first: it lands under the shade's solid panel, then behind the game.
+        let _ = SetWindowPos(hwnd(h), Some(HWND_NOTOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        drop();
+        let _ = SetWindowPlacement(hwnd(h), &wp);
+    }
+    // Maximising always activates the window, which lifts it above the game; put it back behind.
+    drop();
 }
 
 /// Makes a window the foreground window. Glaude may do this straight after its hotkey or a click on the shade;

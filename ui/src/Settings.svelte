@@ -1,5 +1,30 @@
 <script>
   import { invoke } from '@tauri-apps/api/core';
+  import { getVersion } from '@tauri-apps/api/app';
+  import { listen } from '@tauri-apps/api/event';
+  import { markdown } from './markdown.js';
+
+  let version = $state('');
+  let update = $state({ state: 'idle' });
+  let notes = $state(null);
+  getVersion().then((v) => (version = v));
+  const loadUpdate = () => {
+    invoke('update_status').then((s) => (update = s));
+    invoke('update_notes').then((n) => (notes = n));
+  };
+  loadUpdate();
+  listen('updater://status', loadUpdate);
+  const busy = $derived(update.state === 'checking' || update.state === 'downloading');
+  const updateText = $derived(
+    {
+      idle: 'Not checked yet.',
+      checking: 'Checking for updates…',
+      upToDate: 'Glaude is up to date.',
+      downloading: `Downloading ${update.version}: ${update.percent}%`,
+      ready: `Version ${update.version} is ready. It installs when you press Install or quit Glaude.`,
+      error: update.message,
+    }[update.state],
+  );
 
   let settings = $state(null);
   let hotkeyError = $state('');
@@ -56,8 +81,18 @@
     await stopRecording();
   }
 
-  function setApp(field, value) {
-    save({ ...settings, app: { ...settings.app, [field]: value } });
+  function setApp(i, field, value) {
+    save({ ...settings, apps: settings.apps.map((a, j) => (j === i ? { ...a, [field]: value } : a)) });
+  }
+
+  function move(i, by) {
+    const apps = [...settings.apps];
+    [apps[i], apps[i + by]] = [apps[i + by], apps[i]];
+    save({ ...settings, apps });
+  }
+
+  function remove(i) {
+    save({ ...settings, apps: settings.apps.filter((_, j) => j !== i) });
   }
 
   let running = $state(null);
@@ -65,8 +100,8 @@
   async function browse() {
     saveError = '';
     try {
-      const app = await invoke('app_browse');
-      if (app) settings = { ...settings, app };
+      const next = await invoke('app_browse');
+      if (next) settings = next;
     } catch (e) {
       saveError = String(e);
     }
@@ -79,7 +114,7 @@
   async function attach(w) {
     saveError = '';
     try {
-      settings = { ...settings, app: await invoke('app_attach', { hwnd: w.hwnd }) };
+      settings = await invoke('app_attach', { hwnd: w.hwnd });
       running = null;
     } catch (e) {
       saveError = String(e);
@@ -119,8 +154,25 @@
     </section>
 
     <section>
-      <h2>App</h2>
-      <p class="soft">Started the first time you open the overlay, or taken over if it is already open, then kept out of sight between opens.</p>
+      <h2>Apps</h2>
+      <p class="soft">
+        The hotkey opens the one you used last; with two or more, a strip along the top of the panel switches between them. An app
+        that is already open is shown as it is, and goes back to its place on your desktop when you switch away or close.
+      </p>
+      <ul class="apps">
+        {#each settings.apps as a, i (i)}
+          <li>
+            <input class="name" value={a.name} title="Name on the strip" onchange={(e) => setApp(i, 'name', e.currentTarget.value)} />
+            <span class="soft exe" title={a.exe}>{fileName(a.exe)}</span>
+            <input class="args" value={a.args} placeholder="Arguments" onchange={(e) => setApp(i, 'args', e.currentTarget.value)} />
+            <button title="Move up" disabled={i === 0} onclick={() => move(i, -1)}>↑</button>
+            <button title="Move down" disabled={i === settings.apps.length - 1} onclick={() => move(i, 1)}>↓</button>
+            <button title="Remove" onclick={() => remove(i)}>Remove</button>
+          </li>
+        {:else}
+          <li class="soft">No apps yet. Add one below.</li>
+        {/each}
+      </ul>
       <div class="buttons">
         <button onclick={browse}>Browse for a program</button>
         <button onclick={listRunning}>{running ? 'Hide running apps' : 'Pick a running app'}</button>
@@ -134,16 +186,40 @@
           {/each}
         </ul>
       {/if}
-      <label>Name <input value={settings.app.name} onchange={(e) => setApp('name', e.currentTarget.value)} /></label>
-      <label>Program <input value={settings.app.exe} onchange={(e) => setApp('exe', e.currentTarget.value)} /></label>
-      <label>Arguments <input value={settings.app.args} onchange={(e) => setApp('args', e.currentTarget.value)} /></label>
-      <label>
-        Window comes from
-        <input value={settings.app.windowExe} placeholder="Only if the program hands off to another" onchange={(e) => setApp('windowExe', e.currentTarget.value)} />
-      </label>
     </section>
 
     {#if saveError}<p class="error">{saveError}</p>{/if}
+
+    <section>
+      <h2>Updates</h2>
+      <p class:error={update.state === 'error'} class:soft={update.state !== 'error'}>{updateText}</p>
+      <div class="buttons">
+        <button disabled={busy} onclick={() => invoke('update_check')}>Check for updates</button>
+        {#if update.state === 'ready'}<button class="go" onclick={() => invoke('update_install')}>Install {update.version}</button>{/if}
+      </div>
+      {#if notes?.markdown}
+        <div class="notes">
+          <p class="soft">{notes.version === version ? "What's new in this version" : `What's new in ${notes.version}`}</p>
+          {@html markdown(notes.markdown)}
+        </div>
+      {/if}
+    </section>
+
+    <section>
+      <h2>About</h2>
+      <p>Glaude {version}. MIT licence, copyright 2026 doolecg.</p>
+      <p class="soft">
+        Provided "as is", without warranty, under the MIT licence. To the extent permitted by law, the authors are not
+        liable for any loss or damage from using it. Back up your work.
+      </p>
+      <p class="soft">Updates come from github.com/doolecg/Glaude releases. Glaude sends nothing else off your computer.</p>
+      <p class="soft">
+        Glaude moves other programs' windows and starts the programs you add. It does not change anything inside them, and
+        cannot promise how a game or its anti-cheat reacts. Built on open-source software; the licences are in
+        THIRD_PARTY_NOTICES.txt in Glaude's install folder. Not affiliated with Anthropic, Microsoft or the makers of the
+        apps and games you use with it.
+      </p>
+    </section>
   </main>
 {/if}
 
@@ -224,6 +300,40 @@
   .buttons {
     display: flex;
     gap: 8px;
+    margin-top: 10px;
+  }
+  .apps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .apps li {
+    display: grid;
+    grid-template-columns: 1fr 110px 1fr auto auto auto;
+    gap: 6px;
+    align-items: center;
+    margin-top: 6px;
+  }
+  .apps .exe {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .apps button {
+    background: #0f1215;
+    color: #e6e8eb;
+    border: 0;
+    border-radius: 6px;
+    padding: 7px 10px;
+    font: inherit;
+    cursor: pointer;
+  }
+  .apps button:disabled {
+    color: #3a4048;
+    cursor: default;
+  }
+  .apps input {
+    min-width: 0;
   }
   .buttons button,
   .running button {
@@ -255,6 +365,36 @@
     justify-content: space-between;
     gap: 12px;
     text-align: left;
+  }
+  .buttons button:disabled {
+    color: #3a4048;
+    cursor: default;
+  }
+  .buttons .go {
+    color: #2fbfa8;
+  }
+  .notes {
+    margin-top: 12px;
+    font-size: 0.92rem;
+  }
+  .notes :global(h1) {
+    font-size: 1.05rem;
+    margin: 0 0 6px;
+  }
+  .notes :global(h2) {
+    font-size: 0.95rem;
+    margin: 10px 0 4px;
+  }
+  .notes :global(ul) {
+    margin: 0;
+    padding-left: 20px;
+  }
+  .notes :global(li) {
+    margin-bottom: 4px;
+  }
+  .notes :global(hr) {
+    border: 0;
+    margin: 12px 0;
   }
   .running button span:first-child {
     overflow: hidden;
