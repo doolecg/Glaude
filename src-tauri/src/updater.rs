@@ -22,7 +22,7 @@ pub enum Status {
     Checking,
     UpToDate,
     Downloading { version: String, percent: u8 },
-    Ready { version: String },
+    Ready { version: String, error: Option<String> },
     Error { message: String },
 }
 
@@ -52,7 +52,7 @@ fn set_status(app: &AppHandle, status: Status) {
     *app.state::<Updater>().status.lock().unwrap() = status.clone();
     let _ = app.emit(STATUS_EVENT, &status);
     crate::tray_update_ready(app, match &status {
-        Status::Ready { version } => Some(version.as_str()),
+        Status::Ready { version, .. } => Some(version.as_str()),
         _ => None,
     });
 }
@@ -94,7 +94,7 @@ async fn run_check(app: &AppHandle) -> Status {
     match downloaded {
         Ok(bytes) => {
             *app.state::<Updater>().ready.lock().unwrap() = Some((update, bytes));
-            Status::Ready { version }
+            Status::Ready { version, error: None }
         }
         Err(e) => Status::Error { message: format!("The update did not download: {e}") },
     }
@@ -123,11 +123,21 @@ pub fn start(app: &AppHandle) {
     });
 }
 
+/// Runs an installer without discarding the waiting update unless it succeeds.
+fn install_ready<T, E>(ready: &mut Option<T>, install: impl FnOnce(&T) -> Result<(), E>) -> Result<bool, E> {
+    let Some(update) = ready.as_ref() else { return Ok(false) };
+    install(update)?;
+    *ready = None;
+    Ok(true)
+}
+
 /// Runs the waiting installer, if there is one. Windows' installer closes Glaude, replaces it and starts it again.
 pub fn install(app: &AppHandle) -> Result<bool, String> {
-    let Some((update, bytes)) = app.state::<Updater>().ready.lock().unwrap().take() else { return Ok(false) };
-    update.install(bytes).map_err(|e| format!("The update did not install: {e}"))?;
-    Ok(true)
+    let updater = app.state::<Updater>();
+    let mut ready = updater.ready.lock().unwrap();
+    install_ready(&mut ready, |(update, bytes)| {
+        update.install(bytes).map_err(|e| format!("The update did not install: {e}"))
+    })
 }
 
 #[tauri::command]
@@ -144,11 +154,52 @@ pub fn update_check(app: AppHandle) {
 pub fn update_install(app: AppHandle) {
     crate::overlay::release(&app);
     if let Err(message) = install(&app) {
-        set_status(&app, Status::Error { message });
+        let version = app.state::<Updater>().ready.lock().unwrap().as_ref().map(|(update, _)| update.version.clone());
+        let status = match version {
+            Some(version) => Status::Ready { version, error: Some(message) },
+            None => Status::Error { message },
+        };
+        set_status(&app, status);
     }
 }
 
 #[tauri::command]
 pub fn update_notes(updater: State<Updater>) -> Notes {
     updater.notes.lock().unwrap().clone()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::install_ready;
+
+    #[test]
+    fn failed_install_keeps_update_ready() {
+        let update = (String::from("1.2.3"), vec![1, 2, 3]);
+        let mut ready = Some(update.clone());
+
+        let result = install_ready(&mut ready, |_| Err("installer refused"));
+
+        assert_eq!(result, Err("installer refused"));
+        assert_eq!(ready, Some(update));
+    }
+
+    #[test]
+    fn successful_install_clears_ready_update() {
+        let mut ready = Some((String::from("1.2.3"), vec![1, 2, 3]));
+
+        let result = install_ready(&mut ready, |_| Ok::<(), &str>(()));
+
+        assert_eq!(result, Ok(true));
+        assert_eq!(ready, None);
+    }
+
+    #[test]
+    fn install_without_ready_update_is_a_noop() {
+        let mut ready: Option<(String, Vec<u8>)> = None;
+
+        let result = install_ready(&mut ready, |_| -> Result<(), &str> { panic!("installer should not run") });
+
+        assert_eq!(result, Ok(false));
+        assert!(ready.is_none());
+    }
 }
