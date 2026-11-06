@@ -21,7 +21,7 @@
       checking: 'Checking for updates…',
       upToDate: 'Glaude is up to date.',
       downloading: `Downloading ${update.version}: ${update.percent}%`,
-      ready: `Version ${update.version} is ready. It installs when you press Install or quit Glaude.`,
+      ready: update.error ?? `Version ${update.version} is ready. It installs when you press Install or quit Glaude.`,
       error: update.message,
     }[update.state],
   );
@@ -192,7 +192,7 @@
 
     <section>
       <h2>Updates</h2>
-      <p class:error={update.state === 'error'} class:soft={update.state !== 'error'}>{updateText}</p>
+      <p class:error={update.state === 'error' || !!update.error} class:soft={update.state !== 'error' && !update.error}>{updateText}</p>
       <div class="buttons">
         <button disabled={busy} onclick={() => invoke('update_check')}>Check for updates</button>
         {#if update.state === 'ready'}<button class="go" onclick={() => invoke('update_install')}>Install {update.version}</button>{/if}
